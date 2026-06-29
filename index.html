@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prime Chemicals – Tank Stock Register</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #20243a;
+    --border: #2e3350;
+    --accent: #4f8ef7;
+    --accent2: #7c3aed;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --white: #ffffff;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-left { display:flex; align-items:center; gap:12px; }
+  .logo { width:36px; height:36px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; }
+  .app-title { font-size:16px; font-weight:600; }
+  .app-sub { font-size:11px; color:var(--muted); }
+  .topbar-right { display:flex; gap:8px; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3b7de8; }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-success:hover { background: #16a34a; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--card); }
+  .btn-pdf { background: linear-gradient(135deg,#7c3aed,#4f8ef7); color:#fff; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── SETUP SCREEN ── */
+  #setup-screen {
+    max-width: 480px;
+    margin: 80px auto;
+    padding: 20px;
+  }
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+  .setup-card h2 { font-size:20px; margin-bottom:6px; }
+  .setup-card p { font-size:13px; color:var(--muted); margin-bottom:24px; }
+  .form-group { margin-bottom:16px; }
+  .form-group label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:500; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group select:focus {
+    border-color: var(--accent);
+  }
+
+  /* ── MAIN APP ── */
+  #main-app { display:none; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  /* ── SUMMARY CARDS ── */
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  @media(max-width:768px) { .summary-row { grid-template-columns: repeat(2,1fr); } }
+  .sum-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .sum-card .label { font-size:11px; color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:.5px; }
+  .sum-card .value { font-size:24px; font-weight:700; margin-top:4px; }
+  .sum-card .unit { font-size:12px; color:var(--muted); }
+  .val-blue { color: var(--accent); }
+  .val-green { color: var(--green); }
+  .val-red { color: var(--red); }
+  .val-yellow { color: var(--yellow); }
+
+  /* ── ACTION BAR ── */
+  .action-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .date-display {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size:13px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  /* ── TANK GRID ── */
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tank-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .tank-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .tank-card:hover { border-color: var(--accent); }
+  .tank-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .tank-num {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(79,142,247,.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .tank-actions { display:flex; gap:6px; }
+  .tank-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .tank-material { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+
+  .stock-bar-wrap { margin-bottom: 12px; }
+  .stock-bar-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .stock-bar-bg { height:6px; background:var(--card); border-radius:3px; overflow:hidden; }
+  .stock-bar-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--accent),var(--green)); transition:width .3s; }
+  .stock-bar-fill.low { background: linear-gradient(90deg,var(--yellow),var(--red)); }
+
+  .tank-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stat-box { background:var(--card); border-radius:6px; padding:8px 10px; text-align:center; }
+  .stat-box .s-label { font-size:10px; color:var(--muted); display:block; margin-bottom:2px; }
+  .stat-box .s-val { font-size:14px; font-weight:700; }
+  .stat-box.added .s-val { color:var(--green); }
+  .stat-box.used .s-val { color:var(--red); }
+  .stat-box.closing .s-val { color:var(--accent); }
+
+  .quick-btns { display:flex; gap:6px; }
+  .quick-btns .btn { flex:1; justify-content:center; }
+
+  /* ── MODALS ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.active { display:flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    width: 100%;
+    max-width: 420px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h3 { font-size:18px; font-weight:600; margin-bottom:4px; }
+  .modal .modal-sub { font-size:13px; color:var(--muted); margin-bottom:20px; }
+  .modal-footer { display:flex; gap:10px; margin-top:20px; justify-content:flex-end; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all .3s;
+    pointer-events: none;
+  }
+  #toast.show { opacity:1; transform:translateY(0); }
+  #toast.success { background:#16a34a; color:#fff; }
+  #toast.error { background:#dc2626; color:#fff; }
+  #toast.info { background:var(--accent); color:#fff; }
+
+  /* ── TRANSACTION LOG ── */
+  .log-section { margin-top: 24px; }
+  .log-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .log-table th {
+    text-align:left; padding:10px 12px; background:var(--card);
+    color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-table td { padding:10px 12px; border-bottom:1px solid var(--border); }
+  .log-table tr:hover td { background:rgba(255,255,255,.02); }
+  .badge {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;
+  }
+  .badge-in { background:rgba(34,197,94,.15); color:var(--green); }
+  .badge-out { background:rgba(239,68,68,.15); color:var(--red); }
+  .badge-adj { background:rgba(245,158,11,.15); color:var(--yellow); }
+
+  /* ── LOADING ── */
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    margin: 40px auto;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .empty-state { text-align:center; padding:40px; color:var(--muted); font-size:14px; }
+
+  /* ── MANAGE MATERIALS MODAL ── */
+  .material-list { max-height:300px; overflow-y:auto; }
+  .material-item {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 12px; background:var(--card); border-radius:8px; margin-bottom:6px;
+  }
+  .material-item .m-name { font-size:14px; font-weight:500; }
+  .material-item .m-unit { font-size:11px; color:var(--muted); }
+  .del-btn { background:none; border:none; cursor:pointer; color:var(--red); font-size:16px; padding:2px 6px; border-radius:4px; }
+  .del-btn:hover { background:rgba(239,68,68,.15); }
+
+  /* PDF Preview note */
+  .pdf-note { background:rgba(79,142,247,.08); border:1px solid rgba(79,142,247,.2); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--muted); margin-bottom:16px; }
+
+  /* Responsive */
+  @media(max-width:600px) {
+    .topbar { padding:10px 14px; }
+    .app-title { font-size:14px; }
+    .container { padding:12px; }
+    .tank-grid { grid-template-columns:1fr; }
+    .summary-row { grid-template-columns:1fr 1fr; }
+  }
+
+  /* Settings area */
+  .settings-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .settings-section label { font-size:13px; color:var(--muted); }
+  .settings-section input { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:6px 10px; color:var(--text); font-size:13px; font-family:'Inter',sans-serif; outline:none; }
+
+  .carry-note { font-size:11px; color:var(--yellow); background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.2); padding:4px 10px; border-radius:6px; }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div style="text-align:center;margin-bottom:28px;">
+    <div style="width:56px;height:56px;background:linear-gradient(135deg,#4f8ef7,#7c3aed);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;margin:0 auto 12px;">PC</div>
+    <h1 style="font-size:22px;font-weight:700;">Tank Stock Register</h1>
+    <p style="font-size:13px;color:#64748b;margin-top:4px;">Prime Chemicals – GIDC Panoli</p>
+  </div>
+  <div class="setup-card">
+    <h2>🔌 Supabase Setup</h2>
+    <p>Pehli var setup karo. Pachhi data save thay che.</p>
+    <div class="form-group">
+      <label>SUPABASE URL</label>
+      <input type="text" id="sb-url" placeholder="https://xxxx.supabase.co" />
+    </div>
+    <div class="form-group">
+      <label>ANON KEY</label>
+      <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIs..." />
+    </div>
+    <div class="form-group">
+      <label>COMPANY NAME (PDF maa aavse)</label>
+      <input type="text" id="co-name" value="Prime Chemicals Pvt. Ltd." />
+    </div>
+    <button class="btn btn-primary" onclick="doSetup()" style="width:100%;justify-content:center;padding:12px;">
+      ✅ Connect & Start
+    </button>
+    <div id="setup-msg" style="margin-top:12px;font-size:13px;text-align:center;"></div>
+  </div>
+  <p style="text-align:center;font-size:11px;color:#334155;margin-top:16px;">
+    Supabase maa 3 tables banavo: <code>tanks</code>, <code>materials</code>, <code>stock_entries</code>
+  </p>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">PC</div>
+      <div>
+        <div class="app-title">Tank Stock Register</div>
+        <div class="app-sub" id="topbar-company">Prime Chemicals</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm" onclick="openMaterialModal()">+ Material</button>
+      <button class="btn btn-ghost btn-sm" onclick="openAddTankModal()">+ Tank</button>
+      <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF Report</button>
+      <button class="btn btn-ghost btn-sm" onclick="logout()" title="Logout">⚙️</button>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Summary -->
+    <div class="summary-row" style="margin-top:16px;">
+      <div class="sum-card">
+        <div class="label">Active Tanks</div>
+        <div class="value val-blue" id="s-tanks">–</div>
+        <div class="unit">tanks</div>
+      </div>
+      <div class="sum-card">
+        <div class="label">Today Added (IN)</div>
+        <div class="value val-green" id="s-in">–</div>
+        <div class="unit">KL / KG total</div>
+      </div>
+      <div class="sum-card">
+        <div class="label">Today Used (OUT)</div>
+        <div class="value val-red" id="s-out">–</div>
+        <div class="unit">KL / KG total</div>
+      </div>
+      <div class="sum-card">
+        <div class="label">Closing Stock</div>
+        <div class="value val-yellow" id="s-closing">–</div>
+        <div class="unit">combined units</div>
+      </div>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <div class="carry-note" id="carry-note" style="display:none;">⚠️ Kaal ni usage aaj open stock mathi minus thai che</div>
+      <div class="date-display" id="today-date"></div>
+    </div>
+
+    <!-- Tank Grid -->
+    <div class="section-title">🛢️ Tank Status – Today</div>
+    <div class="tank-grid" id="tank-grid">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Transaction Log -->
+    <div class="log-section">
+      <div class="section-title">📋 Aaj Na Transactions</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Tank</th>
+              <th>Material</th>
+              <th>Type</th>
+              <th>Quantity</th>
+              <th>Remark</th>
+            </tr>
+          </thead>
+          <tbody id="log-tbody">
+            <tr><td colspan="6"><div class="empty-state">Haju koi transaction nathi</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- ADD / USE STOCK MODAL -->
+<div class="modal-overlay" id="stock-modal">
+  <div class="modal">
+    <h3 id="stock-modal-title">Stock Update</h3>
+    <div class="modal-sub" id="stock-modal-sub">Tank ni details</div>
+    <div class="form-group">
+      <label>QUANTITY</label>
+      <input type="number" id="txn-qty" placeholder="0.00" min="0" step="0.01" />
+    </div>
+    <div class="form-group">
+      <label>UNIT</label>
+      <select id="txn-unit">
+        <option value="KL">KL (Kilo Litre)</option>
+        <option value="KG">KG (Kilo Gram)</option>
+        <option value="MT">MT (Metric Ton)</option>
+        <option value="L">L (Litre)</option>
+        <option value="Drum">Drum</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>REMARK (optional)</label>
+      <input type="text" id="txn-remark" placeholder="e.g. Tanker no. TN-2024..." />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('stock-modal')">Cancel</button>
+      <button class="btn btn-success" id="stock-save-btn" onclick="saveTransaction()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TANK MODAL -->
+<div class="modal-overlay" id="add-tank-modal">
+  <div class="modal">
+    <h3>🛢️ Navo Tank Umervo</h3>
+    <div class="modal-sub">Tank ni mahiti bharvo</div>
+    <div class="form-group">
+      <label>TANK NUMBER / NAME</label>
+      <input type="text" id="new-tank-name" placeholder="Tank-15 ya TK-15" />
+    </div>
+    <div class="form-group">
+      <label>MATERIAL (Select or type new)</label>
+      <select id="new-tank-material">
+        <option value="">-- Select Material --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>CAPACITY</label>
+      <input type="number" id="new-tank-capacity" placeholder="50" min="0" step="0.01"/>
+    </div>
+    <div class="form-group">
+      <label>CAPACITY UNIT</label>
+      <select id="new-tank-unit">
+        <option value="KL">KL</option>
+        <option value="KG">KG</option>
+        <option value="MT">MT</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>OPENING STOCK (aaj na starting stock)</label>
+      <input type="number" id="new-tank-opening" placeholder="0" min="0" step="0.01"/>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('add-tank-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTank()">Tank Add Karo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE MATERIALS MODAL -->
+<div class="modal-overlay" id="material-modal">
+  <div class="modal">
+    <h3>🧪 Materials Manage Karo</h3>
+    <div class="modal-sub">Nava material umervo ya delete karo</div>
+    <div class="form-group" style="display:flex;gap:8px;align-items:flex-end;">
+      <div style="flex:1;">
+        <label>NEW MATERIAL NAME</label>
+        <input type="text" id="new-mat-name" placeholder="HCl, NaOH, Toluene..." />
+      </div>
+      <button class="btn btn-success btn-sm" style="height:38px;" onclick="addMaterial()">+ Add</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;">Existing Materials</div>
+    <div class="material-list" id="material-list">
+      <div class="spinner"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('material-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF CONFIG MODAL -->
+<div class="modal-overlay" id="pdf-modal">
+  <div class="modal">
+    <h3>📄 Daily Stock Report – PDF</h3>
+    <div class="modal-sub">Report generate karva maate</div>
+    <div class="pdf-note">
+      ℹ️ Aa report aaj na date maa badhi tanks ni opening, IN, OUT ane closing stock batavse.
+      Sir ne WhatsApp/Email thi moki shakaay.
+    </div>
+    <div class="form-group">
+      <label>REPORT DATE</label>
+      <input type="date" id="pdf-date" />
+    </div>
+    <div class="form-group">
+      <label>PREPARED BY</label>
+      <input type="text" id="pdf-by" placeholder="Your name" />
+    </div>
+    <div class="form-group">
+      <label>REMARKS (optional)</label>
+      <input type="text" id="pdf-remarks" placeholder="e.g. Month end report..." />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('pdf-modal')">Cancel</button>
+      <button class="btn btn-pdf" onclick="downloadPDF()">⬇️ Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// GLOBALS
+// ════════════════════════════════════════════════════════
+let supabase = null;
+let companyName = 'Prime Chemicals Pvt. Ltd.';
+let currentTankId = null;
+let currentTxnType = null; // 'IN' | 'OUT'
+let tanksData = [];
+let materialsData = [];
+let todayEntries = [];
+const TODAY = new Date().toISOString().split('T')[0];
+
+// ════════════════════════════════════════════════════════
+// SETUP
+// ════════════════════════════════════════════════════════
+window.onload = () => {
+  const savedUrl = localStorage.getItem('pc_sb_url');
+  const savedKey = localStorage.getItem('pc_sb_key');
+  const savedCo  = localStorage.getItem('pc_co_name');
+  if (savedUrl && savedKey) {
+    initSupabase(savedUrl, savedKey, savedCo || companyName);
+  }
+  document.getElementById('today-date').textContent = formatDate(TODAY);
+  document.getElementById('pdf-date').value = TODAY;
+  document.getElementById('pdf-by').value = localStorage.getItem('pc_user') || '';
+};
+
+async function doSetup() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  const co  = document.getElementById('co-name').value.trim();
+  const msg = document.getElementById('setup-msg');
+  const btn = document.querySelector('#setup-screen .btn-primary');
+
+  if (!url || !key) { msg.textContent = '⚠️ URL ane Key jruri che'; msg.style.color='#ef4444'; return; }
+
+  msg.textContent = '⏳ Connecting... (10-15 seconds raho)';
+  msg.style.color='#f59e0b';
+  btn.disabled = true;
+  btn.textContent = '⏳ Connecting...';
+
+  try {
+    await initSupabase(url, key, co);
+    localStorage.setItem('pc_sb_url', url);
+    localStorage.setItem('pc_sb_key', key);
+    localStorage.setItem('pc_co_name', co);
+    msg.textContent = '✅ Connected!';
+    msg.style.color='#22c55e';
+  } catch(e) {
+    msg.textContent = '❌ Error: ' + e.message;
+    msg.style.color='#ef4444';
+    btn.disabled = false;
+    btn.textContent = '✅ Connect & Start';
+    console.error('Setup error:', e);
+  }
+}
+
+async function initSupabase(url, key, co) {
+  // Create supabase client
+  const { createClient } = window.supabase;
+  supabase = createClient(url, key, {
+    auth: { persistSession: false }
+  });
+
+  companyName = co || 'Prime Chemicals';
+
+  // Test connection
+  const { data, error } = await supabase.from('materials').select('id').limit(1);
+
+  if (error) {
+    if (error.code === '42P01' || error.message.includes('does not exist')) {
+      throw new Error('Tables mavi nathi — Supabase SQL Editor ma 3 tables banavo pehla');
+    } else if (error.message.includes('Invalid API key') || error.message.includes('apikey')) {
+      throw new Error('Anon Key galat che — pharthi copy karo');
+    } else if (error.message.includes('fetch') || error.message.includes('network')) {
+      throw new Error('Internet connection check karo');
+    } else {
+      throw new Error(error.message);
+    }
+  }
+
+  document.getElementById('topbar-company').textContent = companyName;
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  await loadAll();
+}
+
+function logout() {
+  if (confirm('Logout karvu che? (Settings clear thase)')) {
+    localStorage.removeItem('pc_sb_url');
+    localStorage.removeItem('pc_sb_key');
+    location.reload();
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// LOAD DATA
+// ════════════════════════════════════════════════════════
+async function loadAll() {
+  await Promise.all([loadMaterials(), loadTanks(), loadTodayEntries()]);
+  renderTankGrid();
+  renderLog();
+  updateSummary();
+}
+
+async function loadMaterials() {
+  const { data, error } = await supabase.from('materials').select('*').order('name');
+  if (error) return showToast('Materials load nahi thaya', 'error');
+  materialsData = data || [];
+  populateMaterialDropdowns();
+}
+
+async function loadTanks() {
+  const { data, error } = await supabase.from('tanks').select('*').eq('active', true).order('tank_number');
+  if (error) return showToast('Tanks load nahi thaya', 'error');
+  tanksData = data || [];
+}
+
+async function loadTodayEntries() {
+  const { data, error } = await supabase
+    .from('stock_entries')
+    .select('*, tanks(tank_number, tank_name), materials(name)')
+    .eq('entry_date', TODAY)
+    .order('created_at', { ascending: false });
+  if (error) return;
+  todayEntries = data || [];
+}
+
+// ════════════════════════════════════════════════════════
+// RENDER TANKS
+// ════════════════════════════════════════════════════════
+function renderTankGrid() {
+  const grid = document.getElementById('tank-grid');
+  if (tanksData.length === 0) {
+    grid.innerHTML = '<div class="empty-state">Koi tank nathi. "+ Tank" button thi tank umervo.</div>';
+    return;
+  }
+  grid.innerHTML = tanksData.map(tank => renderTankCard(tank)).join('');
+}
+
+function renderTankCard(tank) {
+  const entries = todayEntries.filter(e => e.tank_id === tank.id);
+  const totalIN  = entries.filter(e=>e.txn_type==='IN').reduce((s,e)=>s+e.quantity,0);
+  const totalOUT = entries.filter(e=>e.txn_type==='OUT').reduce((s,e)=>s+e.quantity,0);
+  const opening  = tank.opening_stock || 0;
+  const closing  = opening + totalIN - totalOUT;
+  const cap = tank.capacity || 1;
+  const pct = Math.min(100, Math.max(0, (closing/cap)*100)).toFixed(0);
+  const isLow = pct < 20;
+  const mat = materialsData.find(m=>m.id===tank.material_id);
+  const matName = mat ? mat.name : (tank.material_name || 'Unknown');
+  const unit = tank.unit || 'KL';
+
+  return `
+  <div class="tank-card" id="tc-${tank.id}">
+    <div class="tank-header">
+      <div>
+        <div class="tank-num">${tank.tank_number}</div>
+        <div class="tank-name" style="margin-top:6px;">${tank.tank_name || tank.tank_number}</div>
+        <div class="tank-material">🧪 ${matName}</div>
+      </div>
+      <div class="tank-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editTankOpening(${JSON.stringify(tank).replace(/"/g,'&quot;')})" title="Opening set karo">✏️</button>
+      </div>
+    </div>
+    <div class="stock-bar-wrap">
+      <div class="stock-bar-labels">
+        <span>Closing: <b>${fmt(closing)} ${unit}</b></span>
+        <span>${pct}%</span>
+      </div>
+      <div class="stock-bar-bg">
+        <div class="stock-bar-fill ${isLow?'low':''}" style="width:${pct}%"></div>
+      </div>
+    </div>
+    <div class="tank-stats">
+      <div class="stat-box">
+        <span class="s-label">Opening</span>
+        <span class="s-val">${fmt(opening)}</span>
+      </div>
+      <div class="stat-box added">
+        <span class="s-label">IN ▲</span>
+        <span class="s-val">${fmt(totalIN)}</span>
+      </div>
+      <div class="stat-box used">
+        <span class="s-label">OUT ▼</span>
+        <span class="s-val">${fmt(totalOUT)}</span>
+      </div>
+    </div>
+    <div class="quick-btns">
+      <button class="btn btn-success btn-sm" onclick="openStockModal(${tank.id},'IN')">▲ Material Avyu (IN)</button>
+      <button class="btn btn-danger btn-sm" onclick="openStockModal(${tank.id},'OUT')">▼ Use Karyuu (OUT)</button>
+    </div>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// RENDER LOG
+// ════════════════════════════════════════════════════════
+function renderLog() {
+  const tbody = document.getElementById('log-tbody');
+  if (todayEntries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">Haju koi transaction nathi</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = todayEntries.map(e => {
+    const t = new Date(e.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    const tank = tanksData.find(t=>t.id===e.tank_id);
+    const mat  = materialsData.find(m=>m.id===e.material_id);
+    const badge = e.txn_type==='IN' ? 'badge-in' : e.txn_type==='OUT' ? 'badge-out' : 'badge-adj';
+    return `
+    <tr>
+      <td>${t}</td>
+      <td>${tank?.tank_number || '–'}</td>
+      <td>${mat?.name || e.material_name || '–'}</td>
+      <td><span class="badge ${badge}">${e.txn_type==='IN'?'▲ IN':'▼ OUT'}</span></td>
+      <td><b>${fmt(e.quantity)}</b> ${e.unit || ''}</td>
+      <td style="color:var(--muted);font-size:12px;">${e.remark || '–'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// UPDATE SUMMARY
+// ════════════════════════════════════════════════════════
+function updateSummary() {
+  document.getElementById('s-tanks').textContent = tanksData.length;
+  const totalIN  = todayEntries.filter(e=>e.txn_type==='IN').reduce((s,e)=>s+e.quantity,0);
+  const totalOUT = todayEntries.filter(e=>e.txn_type==='OUT').reduce((s,e)=>s+e.quantity,0);
+  const totalClosing = tanksData.reduce((s,t) => {
+    const entries = todayEntries.filter(e=>e.tank_id===t.id);
+    const IN  = entries.filter(e=>e.txn_type==='IN').reduce((x,e)=>x+e.quantity,0);
+    const OUT = entries.filter(e=>e.txn_type==='OUT').reduce((x,e)=>x+e.quantity,0);
+    return s + (t.opening_stock||0) + IN - OUT;
+  }, 0);
+  document.getElementById('s-in').textContent      = fmt(totalIN);
+  document.getElementById('s-out').textContent     = fmt(totalOUT);
+  document.getElementById('s-closing').textContent = fmt(totalClosing);
+}
+
+// ════════════════════════════════════════════════════════
+// STOCK MODAL
+// ════════════════════════════════════════════════════════
+function openStockModal(tankId, type) {
+  currentTankId  = tankId;
+  currentTxnType = type;
+  const tank = tanksData.find(t=>t.id===tankId);
+  const mat  = materialsData.find(m=>m.id===tank?.material_id);
+  document.getElementById('stock-modal-title').textContent =
+    type==='IN' ? '▲ Material Avyu (IN)' : '▼ Material Vaprayu (OUT)';
+  document.getElementById('stock-modal-sub').textContent =
+    `${tank?.tank_number} – ${mat?.name || ''}`;
+  document.getElementById('txn-qty').value = '';
+  document.getElementById('txn-unit').value = tank?.unit || 'KL';
+  document.getElementById('txn-remark').value = '';
+  const saveBtn = document.getElementById('stock-save-btn');
+  saveBtn.className = 'btn ' + (type==='IN'?'btn-success':'btn-danger');
+  saveBtn.textContent = type==='IN' ? '▲ IN Save Karo' : '▼ OUT Save Karo';
+  openModal('stock-modal');
+  setTimeout(()=>document.getElementById('txn-qty').focus(),100);
+}
+
+async function saveTransaction() {
+  const qty = parseFloat(document.getElementById('txn-qty').value);
+  if (!qty || qty <= 0) { showToast('Sahi quantity nakho', 'error'); return; }
+  const unit   = document.getElementById('txn-unit').value;
+  const remark = document.getElementById('txn-remark').value.trim();
+  const tank   = tanksData.find(t=>t.id===currentTankId);
+
+  // Check if OUT quantity is more than available
+  if (currentTxnType === 'OUT') {
+    const entries = todayEntries.filter(e=>e.tank_id===currentTankId);
+    const IN  = entries.filter(e=>e.txn_type==='IN').reduce((s,e)=>s+e.quantity,0);
+    const OUT = entries.filter(e=>e.txn_type==='OUT').reduce((s,e)=>s+e.quantity,0);
+    const available = (tank?.opening_stock||0) + IN - OUT;
+    if (qty > available) {
+      if (!confirm(`⚠️ Available stock ${fmt(available)} ${unit} che, pan tame ${fmt(qty)} use karva mangu cho. Proceed karvu?`)) return;
+    }
+  }
+
+  const payload = {
+    tank_id:       currentTankId,
+    material_id:   tank?.material_id || null,
+    material_name: materialsData.find(m=>m.id===tank?.material_id)?.name || '',
+    txn_type:      currentTxnType,
+    quantity:       qty,
+    unit:           unit,
+    remark:         remark,
+    entry_date:     TODAY,
+    created_at:     new Date().toISOString()
+  };
+
+  const { error } = await supabase.from('stock_entries').insert([payload]);
+  if (error) { showToast('Save nahi thayuu: ' + error.message, 'error'); return; }
+
+  closeModal('stock-modal');
+  showToast(currentTxnType==='IN' ? '✅ Material IN save thayuu' : '✅ Material OUT save thayuu', 'success');
+  await loadTodayEntries();
+  renderTankGrid();
+  renderLog();
+  updateSummary();
+}
+
+// ════════════════════════════════════════════════════════
+// OPENING STOCK EDIT
+// ════════════════════════════════════════════════════════
+async function editTankOpening(tank) {
+  const newVal = prompt(`${tank.tank_number} – Opening stock (aaj no):\nHal no opening: ${tank.opening_stock || 0} ${tank.unit||'KL'}`, tank.opening_stock || 0);
+  if (newVal === null) return;
+  const val = parseFloat(newVal);
+  if (isNaN(val)) { showToast('Invalid number', 'error'); return; }
+  const { error } = await supabase.from('tanks').update({ opening_stock: val }).eq('id', tank.id);
+  if (error) { showToast('Update nahi thayuu', 'error'); return; }
+  showToast('✅ Opening stock update thayuu', 'success');
+  await loadTanks();
+  renderTankGrid();
+  updateSummary();
+}
+
+// ════════════════════════════════════════════════════════
+// ADD TANK
+// ════════════════════════════════════════════════════════
+function openAddTankModal() {
+  document.getElementById('new-tank-name').value = '';
+  document.getElementById('new-tank-capacity').value = '';
+  document.getElementById('new-tank-opening').value = '0';
+  populateMaterialDropdowns();
+  openModal('add-tank-modal');
+}
+
+async function saveTank() {
+  const num     = document.getElementById('new-tank-name').value.trim();
+  const matId   = document.getElementById('new-tank-material').value;
+  const cap     = parseFloat(document.getElementById('new-tank-capacity').value) || 0;
+  const unit    = document.getElementById('new-tank-unit').value;
+  const opening = parseFloat(document.getElementById('new-tank-opening').value) || 0;
+  if (!num) { showToast('Tank number/name jruri che', 'error'); return; }
+
+  const { error } = await supabase.from('tanks').insert([{
+    tank_number:   num,
+    tank_name:     num,
+    material_id:   matId || null,
+    capacity:      cap,
+    unit:          unit,
+    opening_stock: opening,
+    active:        true
+  }]);
+  if (error) { showToast('Tank add nahi thayuu: ' + error.message, 'error'); return; }
+  closeModal('add-tank-modal');
+  showToast('✅ Tank add thayuu', 'success');
+  await loadTanks();
+  renderTankGrid();
+  updateSummary();
+}
+
+// ════════════════════════════════════════════════════════
+// MATERIALS
+// ════════════════════════════════════════════════════════
+function openMaterialModal() {
+  renderMaterialList();
+  openModal('material-modal');
+}
+
+function renderMaterialList() {
+  const el = document.getElementById('material-list');
+  if (materialsData.length === 0) {
+    el.innerHTML = '<div class="empty-state">Koi material nathi</div>';
+    return;
+  }
+  el.innerHTML = materialsData.map(m => `
+    <div class="material-item">
+      <div>
+        <div class="m-name">${m.name}</div>
+      </div>
+      <button class="del-btn" onclick="deleteMaterial('${m.id}','${m.name}')" title="Delete">🗑️</button>
+    </div>`).join('');
+}
+
+async function addMaterial() {
+  const name = document.getElementById('new-mat-name').value.trim();
+  if (!name) { showToast('Material naam jruri che', 'error'); return; }
+  const { error } = await supabase.from('materials').insert([{ name }]);
+  if (error) { showToast('Add nahi thayuu: ' + error.message, 'error'); return; }
+  document.getElementById('new-mat-name').value = '';
+  showToast('✅ Material add thayuu', 'success');
+  await loadMaterials();
+  renderMaterialList();
+}
+
+async function deleteMaterial(id, name) {
+  if (!confirm(`"${name}" delete karvu che?`)) return;
+  const { error } = await supabase.from('materials').delete().eq('id', id);
+  if (error) { showToast('Delete nahi thayuu', 'error'); return; }
+  showToast('🗑️ Material delete thayuu', 'success');
+  await loadMaterials();
+  renderMaterialList();
+}
+
+function populateMaterialDropdowns() {
+  const sel = document.getElementById('new-tank-material');
+  sel.innerHTML = '<option value="">-- Select Material --</option>' +
+    materialsData.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// PDF GENERATION
+// ════════════════════════════════════════════════════════
+function generatePDF() {
+  document.getElementById('pdf-date').value = TODAY;
+  openModal('pdf-modal');
+}
+
+async function downloadPDF() {
+  const pdfDate   = document.getElementById('pdf-date').value || TODAY;
+  const prepBy    = document.getElementById('pdf-by').value.trim() || 'Operator';
+  const remarks   = document.getElementById('pdf-remarks').value.trim();
+
+  localStorage.setItem('pc_user', prepBy);
+
+  // Load entries for selected date
+  const { data: entries } = await supabase
+    .from('stock_entries')
+    .select('*')
+    .eq('entry_date', pdfDate);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+
+  const W = 210, PL = 14, PR = 196;
+  let y = 0;
+
+  // Header background
+  doc.setFillColor(15,17,23);
+  doc.rect(0, 0, W, 42, 'F');
+
+  // Company name
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16);
+  doc.setFont('helvetica','bold');
+  doc.text(companyName, PL, 14);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(100,116,139);
+  doc.text('GIDC Estate, Panoli, Ankleshwar – Gujarat', PL, 21);
+
+  // Title
+  doc.setFontSize(14);
+  doc.setFont('helvetica','bold');
+  doc.setTextColor(79,142,247);
+  doc.text('DAILY TANK STOCK REPORT', PL, 33);
+
+  // Date on right
+  doc.setFontSize(9);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(200,200,200);
+  doc.text(`Date: ${formatDate(pdfDate)}`, PR, 14, {align:'right'});
+  doc.text(`Prepared by: ${prepBy}`, PR, 21, {align:'right'});
+  if (remarks) doc.text(`Remark: ${remarks}`, PR, 28, {align:'right'});
+
+  y = 50;
+
+  // Build table data
+  const rows = tanksData.map(tank => {
+    const tankEntries = (entries||[]).filter(e=>e.tank_id===tank.id);
+    const IN  = tankEntries.filter(e=>e.txn_type==='IN').reduce((s,e)=>s+e.quantity,0);
+    const OUT = tankEntries.filter(e=>e.txn_type==='OUT').reduce((s,e)=>s+e.quantity,0);
+    const opening = tank.opening_stock || 0;
+    const closing = opening + IN - OUT;
+    const mat = materialsData.find(m=>m.id===tank.material_id);
+    return [
+      tank.tank_number,
+      mat?.name || '–',
+      fmt(opening),
+      fmt(IN),
+      fmt(OUT),
+      fmt(closing),
+      tank.unit || 'KL'
+    ];
+  });
+
+  // Totals row
+  let totO=0,totI=0,totOU=0,totC=0;
+  tanksData.forEach(tank => {
+    const tankEntries = (entries||[]).filter(e=>e.tank_id===tank.id);
+    const IN  = tankEntries.filter(e=>e.txn_type==='IN').reduce((s,e)=>s+e.quantity,0);
+    const OUT = tankEntries.filter(e=>e.txn_type==='OUT').reduce((s,e)=>s+e.quantity,0);
+    const opening = tank.opening_stock || 0;
+    totO+=opening; totI+=IN; totOU+=OUT; totC+=(opening+IN-OUT);
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [['Tank No.', 'Material', 'Opening', 'IN ▲', 'OUT ▼', 'Closing', 'Unit']],
+    body: rows,
+    foot: [['', 'TOTAL', fmt(totO), fmt(totI), fmt(totOU), fmt(totC), '']],
+    headStyles: {
+      fillColor: [30,35,58],
+      textColor: [148,163,184],
+      fontStyle: 'bold',
+      fontSize: 9,
+      halign: 'center'
+    },
+    bodyStyles: { fontSize: 9, halign: 'center', textColor: [30,30,30] },
+    footStyles: {
+      fillColor: [15,17,23],
+      textColor: [255,255,255],
+      fontStyle: 'bold',
+      fontSize: 9,
+      halign: 'center'
+    },
+    alternateRowStyles: { fillColor: [245,247,250] },
+    columnStyles: {
+      0: { halign:'left', cellWidth:22 },
+      1: { halign:'left', cellWidth:42 },
+      2: { cellWidth:22 },
+      3: { cellWidth:22, textColor:[22,163,74] },
+      4: { cellWidth:22, textColor:[220,38,38] },
+      5: { cellWidth:28, fontStyle:'bold' },
+      6: { cellWidth:18 }
+    },
+    margin: { left: PL, right: W-PR },
+    theme: 'grid'
+  });
+
+  y = doc.lastAutoTable.finalY + 12;
+
+  // Transaction details section
+  if ((entries||[]).length > 0) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(50,50,50);
+    doc.text('Transaction Details', PL, y);
+    y += 4;
+
+    const txRows = (entries||[]).map(e => {
+      const tank = tanksData.find(t=>t.id===e.tank_id);
+      const mat  = materialsData.find(m=>m.id===e.material_id);
+      const t = new Date(e.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+      return [
+        t,
+        tank?.tank_number||'–',
+        mat?.name||e.material_name||'–',
+        e.txn_type,
+        `${fmt(e.quantity)} ${e.unit||''}`,
+        e.remark||'–'
+      ];
+    });
+
+    doc.autoTable({
+      startY: y,
+      head: [['Time','Tank','Material','Type','Quantity','Remark']],
+      body: txRows,
+      headStyles: { fillColor:[30,35,58], textColor:[148,163,184], fontSize:8 },
+      bodyStyles: { fontSize:8, textColor:[30,30,30] },
+      alternateRowStyles: { fillColor:[245,247,250] },
+      margin: { left:PL, right:W-PR },
+      theme:'grid',
+      columnStyles: {
+        3: { halign:'center' }
+      },
+      didParseCell: (data) => {
+        if (data.section==='body' && data.column.index===3) {
+          data.cell.styles.textColor = data.cell.text[0]==='IN' ? [22,163,74] : [220,38,38];
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  }
+
+  // Footer
+  const pageH = doc.internal.pageSize.getHeight();
+  doc.setFontSize(8);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(150,150,150);
+  doc.line(PL, pageH-18, PR, pageH-18);
+  doc.text(`${companyName} – Tank Stock Register`, PL, pageH-12);
+  doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, PR, pageH-12, {align:'right'});
+  doc.text('Authorized Signature: _______________________', PL, pageH-6);
+
+  const fn = `Tank_Stock_Report_${pdfDate}.pdf`;
+  doc.save(fn);
+  closeModal('pdf-modal');
+  showToast('✅ PDF download thayuu', 'success');
+}
+
+// ════════════════════════════════════════════════════════
+// CARRY FORWARD (yesterday's OUT becomes today's opening reduction)
+// Auto-handles: opening stock is set manually each day
+// ════════════════════════════════════════════════════════
+// Design: Each morning operator sets opening stock manually
+// OR: Auto-carry from yesterday's closing
+async function autoCarryForward() {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate()-1);
+  const yday = yesterday.toISOString().split('T')[0];
+
+  const { data: yEntries } = await supabase.from('stock_entries').select('*').eq('entry_date', yday);
+  if (!yEntries || yEntries.length === 0) return;
+
+  let updated = 0;
+  for (const tank of tanksData) {
+    const yTankEntries = yEntries.filter(e=>e.tank_id===tank.id);
+    const yIN  = yTankEntries.filter(e=>e.txn_type==='IN').reduce((s,e)=>s+e.quantity,0);
+    const yOUT = yTankEntries.filter(e=>e.txn_type==='OUT').reduce((s,e)=>s+e.quantity,0);
+    const yClosing = (tank.opening_stock||0) + yIN - yOUT;
+    // Only update if tank has no today's transactions yet
+    const todayTxn = todayEntries.filter(e=>e.tank_id===tank.id);
+    if (todayTxn.length === 0 && yClosing !== tank.opening_stock) {
+      await supabase.from('tanks').update({ opening_stock: yClosing }).eq('id', tank.id);
+      updated++;
+    }
+  }
+  if (updated > 0) {
+    showToast(`✅ ${updated} tanks ni opening stock kaal ni closing thi update thayuu`, 'info');
+    document.getElementById('carry-note').style.display='flex';
+    await loadTanks();
+    renderTankGrid();
+    updateSummary();
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════
+function fmt(n) {
+  if (n===undefined||n===null) return '0';
+  return parseFloat(n).toLocaleString('en-IN', {minimumFractionDigits:0, maximumFractionDigits:2});
+}
+
+function formatDate(d) {
+  const dt = new Date(d+'T00:00:00');
+  return dt.toLocaleDateString('en-IN', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+}
+
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// Close modal on outside click
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay')) {
+    e.target.classList.remove('active');
+  }
+});
+
+// Toast
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  setTimeout(()=>{ t.className=''; }, 3000);
+}
+</script>
+
+<!-- SUPABASE SQL HELPER (shown in console) -->
+<script>
+console.log(`
+══════════════════════════════════════
+SUPABASE TABLES – Run this SQL once:
+══════════════════════════════════════
+
+-- Materials table
+create table if not exists materials (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  created_at timestamptz default now()
+);
+
+-- Tanks table
+create table if not exists tanks (
+  id uuid primary key default gen_random_uuid(),
+  tank_number text not null,
+  tank_name text,
+  material_id uuid references materials(id),
+  material_name text,
+  capacity numeric default 0,
+  unit text default 'KL',
+  opening_stock numeric default 0,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+
+-- Stock Entries table
+create table if not exists stock_entries (
+  id uuid primary key default gen_random_uuid(),
+  tank_id uuid references tanks(id),
+  material_id uuid references materials(id),
+  material_name text,
+  txn_type text check (txn_type in ('IN','OUT')),
+  quantity numeric not null,
+  unit text default 'KL',
+  remark text,
+  entry_date date not null,
+  created_at timestamptz default now()
+);
+
+-- RLS (Row Level Security) - Enable in Supabase Dashboard
+-- Or use: alter table materials enable row level security;
+══════════════════════════════════════
+`);
+</script>
+</body>
+</html>
