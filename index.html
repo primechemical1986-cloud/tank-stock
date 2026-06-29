@@ -579,7 +579,7 @@
 // ════════════════════════════════════════════════════════
 // GLOBALS
 // ════════════════════════════════════════════════════════
-let supabase = null;
+let sbClient = null;
 let companyName = 'Prime Chemicals Pvt. Ltd.';
 let currentTankId = null;
 let currentTxnType = null; // 'IN' | 'OUT'
@@ -639,14 +639,14 @@ async function doSetup() {
 async function initSupabase(url, key, co) {
   // Create supabase client
   const { createClient } = window.supabase;
-  supabase = createClient(url, key, {
+  sbClient = createClient(url, key, {
     auth: { persistSession: false }
   });
 
   companyName = co || 'Prime Chemicals';
 
   // Test connection
-  const { data, error } = await supabase.from('materials').select('id').limit(1);
+  const { data, error } = await sbClient.from('materials').select('id').limit(1);
 
   if (error) {
     if (error.code === '42P01' || error.message.includes('does not exist')) {
@@ -685,20 +685,20 @@ async function loadAll() {
 }
 
 async function loadMaterials() {
-  const { data, error } = await supabase.from('materials').select('*').order('name');
+  const { data, error } = await sbClient.from('materials').select('*').order('name');
   if (error) return showToast('Materials load nahi thaya', 'error');
   materialsData = data || [];
   populateMaterialDropdowns();
 }
 
 async function loadTanks() {
-  const { data, error } = await supabase.from('tanks').select('*').eq('active', true).order('tank_number');
+  const { data, error } = await sbClient.from('tanks').select('*').eq('active', true).order('tank_number');
   if (error) return showToast('Tanks load nahi thaya', 'error');
   tanksData = data || [];
 }
 
 async function loadTodayEntries() {
-  const { data, error } = await supabase
+  const { data, error } = await sbClient
     .from('stock_entries')
     .select('*, tanks(tank_number, tank_name), materials(name)')
     .eq('entry_date', TODAY)
@@ -870,7 +870,7 @@ async function saveTransaction() {
     created_at:     new Date().toISOString()
   };
 
-  const { error } = await supabase.from('stock_entries').insert([payload]);
+  const { error } = await sbClient.from('stock_entries').insert([payload]);
   if (error) { showToast('Save nahi thayuu: ' + error.message, 'error'); return; }
 
   closeModal('stock-modal');
@@ -889,7 +889,7 @@ async function editTankOpening(tank) {
   if (newVal === null) return;
   const val = parseFloat(newVal);
   if (isNaN(val)) { showToast('Invalid number', 'error'); return; }
-  const { error } = await supabase.from('tanks').update({ opening_stock: val }).eq('id', tank.id);
+  const { error } = await sbClient.from('tanks').update({ opening_stock: val }).eq('id', tank.id);
   if (error) { showToast('Update nahi thayuu', 'error'); return; }
   showToast('✅ Opening stock update thayuu', 'success');
   await loadTanks();
@@ -916,7 +916,7 @@ async function saveTank() {
   const opening = parseFloat(document.getElementById('new-tank-opening').value) || 0;
   if (!num) { showToast('Tank number/name jruri che', 'error'); return; }
 
-  const { error } = await supabase.from('tanks').insert([{
+  const { error } = await sbClient.from('tanks').insert([{
     tank_number:   num,
     tank_name:     num,
     material_id:   matId || null,
@@ -959,7 +959,7 @@ function renderMaterialList() {
 async function addMaterial() {
   const name = document.getElementById('new-mat-name').value.trim();
   if (!name) { showToast('Material naam jruri che', 'error'); return; }
-  const { error } = await supabase.from('materials').insert([{ name }]);
+  const { error } = await sbClient.from('materials').insert([{ name }]);
   if (error) { showToast('Add nahi thayuu: ' + error.message, 'error'); return; }
   document.getElementById('new-mat-name').value = '';
   showToast('✅ Material add thayuu', 'success');
@@ -969,7 +969,7 @@ async function addMaterial() {
 
 async function deleteMaterial(id, name) {
   if (!confirm(`"${name}" delete karvu che?`)) return;
-  const { error } = await supabase.from('materials').delete().eq('id', id);
+  const { error } = await sbClient.from('materials').delete().eq('id', id);
   if (error) { showToast('Delete nahi thayuu', 'error'); return; }
   showToast('🗑️ Material delete thayuu', 'success');
   await loadMaterials();
@@ -998,7 +998,7 @@ async function downloadPDF() {
   localStorage.setItem('pc_user', prepBy);
 
   // Load entries for selected date
-  const { data: entries } = await supabase
+  const { data: entries } = await sbClient
     .from('stock_entries')
     .select('*')
     .eq('entry_date', pdfDate);
@@ -1176,7 +1176,7 @@ async function autoCarryForward() {
   yesterday.setDate(yesterday.getDate()-1);
   const yday = yesterday.toISOString().split('T')[0];
 
-  const { data: yEntries } = await supabase.from('stock_entries').select('*').eq('entry_date', yday);
+  const { data: yEntries } = await sbClient.from('stock_entries').select('*').eq('entry_date', yday);
   if (!yEntries || yEntries.length === 0) return;
 
   let updated = 0;
@@ -1188,7 +1188,7 @@ async function autoCarryForward() {
     // Only update if tank has no today's transactions yet
     const todayTxn = todayEntries.filter(e=>e.tank_id===tank.id);
     if (todayTxn.length === 0 && yClosing !== tank.opening_stock) {
-      await supabase.from('tanks').update({ opening_stock: yClosing }).eq('id', tank.id);
+      await sbClient.from('tanks').update({ opening_stock: yClosing }).eq('id', tank.id);
       updated++;
     }
   }
