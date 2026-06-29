@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prime Chemicals – Tank Stock Register</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -362,7 +362,7 @@
       <label>COMPANY NAME (PDF maa aavse)</label>
       <input type="text" id="co-name" value="Prime Chemicals Pvt. Ltd." />
     </div>
-    <button class="btn btn-primary" onclick="doSetup()" style="width:100%;justify-content:center;padding:12px;">
+    <button class="btn btn-primary" id="connect-btn" style="width:100%;justify-content:center;padding:12px;">
       ✅ Connect & Start
     </button>
     <div id="setup-msg" style="margin-top:12px;font-size:13px;text-align:center;"></div>
@@ -592,6 +592,9 @@ const TODAY = new Date().toISOString().split('T')[0];
 // SETUP
 // ════════════════════════════════════════════════════════
 window.onload = () => {
+  // Attach connect button listener
+  document.getElementById('connect-btn').addEventListener('click', doSetup);
+
   const savedUrl = localStorage.getItem('pc_sb_url');
   const savedKey = localStorage.getItem('pc_sb_key');
   const savedCo  = localStorage.getItem('pc_co_name');
