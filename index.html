@@ -288,14 +288,14 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('connect-btn').addEventListener('click', doSetup);
   document.getElementById('txn-qty').addEventListener('input', showMtPreview);
 
-  var savedUrl = localStorage.getItem('pc_url');
-  var savedKey = localStorage.getItem('pc_key');
-  var savedCo  = localStorage.getItem('pc_co');
-  if (savedUrl && savedKey) {
-    document.getElementById('sb-url').value = savedUrl;
-    document.getElementById('sb-key').value = savedKey;
-    document.getElementById('co-name').value = savedCo || coName;
-    initApp(savedUrl, savedKey, savedCo || coName);
+  var savedUrl = localStorage.getItem('pc_url') || 'https://bsmspbozhchjqpkpftnx.supabase.co';
+  var savedKey = localStorage.getItem('pc_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzbXNwYm96aGNoanFwa3BmdG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyOTA0MzksImV4cCI6MjA5Nzg2NjQzOX0.aT9ftpeVyg5hHUhbvylR8tPbY3eL1-Z_mE90H-lRJsY';
+  var savedCo  = localStorage.getItem('pc_co')  || 'Prime Chemicals Pvt. Ltd.';
+  document.getElementById('sb-url').value = savedUrl;
+  document.getElementById('sb-key').value = savedKey;
+  document.getElementById('co-name').value = savedCo;
+  if (savedUrl && savedKey && savedKey !== 'PASTE_YOUR_ANON_KEY_HERE') {
+    initApp(savedUrl, savedKey, savedCo);
   }
 
   var d = new Date();
