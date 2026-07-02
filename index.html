@@ -58,8 +58,9 @@ body { font-family: Arial, sans-serif; background:#0f1117; color:#e2e8f0; min-he
 .tank-card:hover { border-color:#4f8ef7; }
 .tank-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
 .tank-num-badge { font-size:10px; font-weight:700; color:#4f8ef7; background:rgba(79,142,247,.12); padding:2px 8px; border-radius:4px; }
-.tank-name { font-size:15px; font-weight:700; margin:6px 0 2px; }
-.tank-mat { font-size:12px; color:#64748b; margin-bottom:12px; }
+.tank-name { font-size:15px; font-weight:700; margin:6px 0 1px; }
+.tank-mat { font-size:15px; font-weight:700; color:#4f8ef7; margin-bottom:4px; }
+.tank-density { font-size:11px; color:#64748b; margin-bottom:10px; }
 
 .bar-wrap { margin-bottom:12px; }
 .bar-labels { display:flex; justify-content:space-between; font-size:11px; color:#64748b; margin-bottom:4px; }
@@ -380,8 +381,13 @@ function loadMats(cb) {
 }
 
 function loadTanks(cb) {
-  sbClient.from('tanks').select('*').eq('active', true).order('tank_number').then(function(res) {
-    tanksData = res.data || [];
+  sbClient.from('tanks').select('*').eq('active', true).then(function(res) {
+    // Numeric sort: Tank 1, Tank 2... Tank 10, Tank 11
+    tanksData = (res.data || []).sort(function(a, b) {
+      var na = parseInt((a.tank_number || '').replace(/\D/g, '')) || 0;
+      var nb = parseInt((b.tank_number || '').replace(/\D/g, '')) || 0;
+      return na - nb;
+    });
     cb();
   });
 }
@@ -422,7 +428,8 @@ function tankCard(t) {
       '<div>' +
         '<span class="tank-num-badge">' + t.tank_number + '</span>' +
         '<div class="tank-name">' + (t.tank_name || t.tank_number) + '</div>' +
-        '<div class="tank-mat">' + matName + (density ? ' | density: ' + density + ' KG/L' : '') + '</div>' +
+        '<div class="tank-mat">' + matName + '</div>' +
+        '<div class="tank-density">' + (density ? 'Density: ' + density + ' KG/L' : '') + '</div>' +
       '</div>' +
       '<button class="btn btn-ghost btn-sm" onclick="openEditOpening(\'' + t.id + '\',\'' + (t.tank_name||t.tank_number).replace(/'/g,"\\'") + '\',' + opening + ',\'' + (t.material_id||'') + '\',' + (t.capacity||0) + ')">Edit</button>' +
     '</div>' +
