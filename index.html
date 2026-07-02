@@ -172,7 +172,7 @@ body { font-family: Arial, sans-serif; background:#0f1117; color:#e2e8f0; min-he
     <div class="sec-title">Aaj Na Transactions</div>
     <div class="log-wrap">
       <table class="log-table">
-        <thead><tr><th>Time</th><th>Tank</th><th>Material</th><th>Type</th><th>Qty (KL)</th><th>MT</th><th>Remark</th></tr></thead>
+        <thead><tr><th>Time</th><th>Tank</th><th>Material</th><th>Type</th><th>KG (Entry)</th><th>KL</th><th>MT</th><th>Remark</th></tr></thead>
         <tbody id="log-tbody"><tr><td colspan="7"><div class="empty">Haju koi transaction nathi</div></td></tr></tbody>
       </table>
     </div>
@@ -185,7 +185,7 @@ body { font-family: Arial, sans-serif; background:#0f1117; color:#e2e8f0; min-he
     <h3 id="txn-title">Stock Update</h3>
     <div class="msub" id="txn-sub">Tank details</div>
     <div class="form-group">
-      <label>QUANTITY (KL)</label>
+      <label id="txn-qty-label">QUANTITY (KG)</label>
       <input type="number" id="txn-qty" placeholder="0.00" min="0" step="0.01" />
       <div class="density-note" id="mt-preview" style="display:none;"></div>
     </div>
@@ -460,15 +460,17 @@ function renderLog() {
     var tank = tanksData.find(function(tk){ return tk.id===e.tank_id; });
     var mat  = matsData.find(function(m){ return m.id===e.material_id; });
     var density = mat ? (mat.density || 0) : 0;
-    var mt = density > 0 ? fmtN(e.quantity * density) : '-';
+    var mt = density > 0 ? fmtN(e.quantity * density * 1000 / 1000) : '-';
+    var kgEntry = e.quantity_kg ? fmtN(e.quantity_kg) : (density > 0 ? fmtN(e.quantity * density * 1000) : '-');
     var badge = e.txn_type==='IN' ? 'badge-in' : 'badge-out';
     return '<tr>' +
       '<td>' + t + '</td>' +
       '<td>' + (tank ? tank.tank_number : '-') + '</td>' +
       '<td>' + (mat ? mat.name : '-') + '</td>' +
       '<td><span class="badge ' + badge + '">' + (e.txn_type==='IN'?'IN':'OUT') + '</span></td>' +
-      '<td><b>' + fmtN(e.quantity) + '</b></td>' +
-      '<td>' + mt + '</td>' +
+      '<td><b>' + kgEntry + ' KG</b></td>' +
+      '<td>' + fmtN(e.quantity) + ' KL</td>' +
+      '<td>' + mt + ' MT</td>' +
       '<td style="color:#64748b;font-size:12px;">' + (e.remark||'-') + '</td>' +
     '</tr>';
   }).join('');
@@ -506,14 +508,29 @@ function openTxnModal(tankId, type) {
   setTimeout(function(){ document.getElementById('txn-qty').focus(); }, 100);
 }
 
-function showMtPreview() {
-  var qty = parseFloat(document.getElementById('txn-qty').value) || 0;
+function getCurDensity() {
   var tank = tanksData.find(function(t){return t.id===curTankId;});
   var mat  = matsData.find(function(m){return m.id===(tank?tank.material_id:null);});
-  var density = mat ? (mat.density||0) : 0;
+  return mat ? (mat.density || 0) : 0;
+}
+
+function kgToKl(kg, density) {
+  if (!density || density <= 0) return kg; // no density = treat as KL directly
+  return kg / (density * 1000);
+}
+
+function showMtPreview() {
+  var kg = parseFloat(document.getElementById('txn-qty').value) || 0;
+  var density = getCurDensity();
   var prev = document.getElementById('mt-preview');
-  if (qty > 0 && density > 0) {
-    prev.textContent = qty + ' KL x ' + density + ' = ' + fmtN(qty*density) + ' MT';
+  if (kg > 0) {
+    if (density > 0) {
+      var kl = kgToKl(kg, density);
+      var mt = kg / 1000;
+      prev.textContent = kg + ' KG  →  ' + fmtN(kl) + ' KL  |  ' + fmtN(mt) + ' MT';
+    } else {
+      prev.textContent = 'Density set nathi — KG as KL save thase';
+    }
     prev.style.display = 'block';
   } else {
     prev.style.display = 'none';
@@ -521,19 +538,24 @@ function showMtPreview() {
 }
 
 function saveTxn() {
-  var qty = parseFloat(document.getElementById('txn-qty').value);
-  if (!qty || qty <= 0) { showToast('Sahi quantity nakho', 'error'); return; }
-  var remark = document.getElementById('txn-remark').value.trim();
-  var tank = tanksData.find(function(t){return t.id===curTankId;});
-  var mat  = matsData.find(function(m){return m.id===(tank?tank.material_id:null);});
+  var kg = parseFloat(document.getElementById('txn-qty').value);
+  if (!kg || kg <= 0) { showToast('Sahi quantity nakho', 'error'); return; }
+  var remark  = document.getElementById('txn-remark').value.trim();
+  var tank    = tanksData.find(function(t){return t.id===curTankId;});
+  var mat     = matsData.find(function(m){return m.id===(tank?tank.material_id:null);});
+  var density = mat ? (mat.density || 0) : 0;
+
+  // Convert KG to KL
+  var qtyKL = density > 0 ? kgToKl(kg, density) : kg;
+  qtyKL = Math.round(qtyKL * 1000) / 1000; // round to 3 decimals
 
   if (curTxnType === 'OUT') {
     var en  = todayEntries.filter(function(e){return e.tank_id===curTankId;});
     var IN  = en.filter(function(e){return e.txn_type==='IN';}).reduce(function(s,e){return s+e.quantity;},0);
     var OUT = en.filter(function(e){return e.txn_type==='OUT';}).reduce(function(s,e){return s+e.quantity;},0);
     var avail = (tank?tank.opening_stock||0:0) + IN - OUT;
-    if (qty > avail + 0.001) {
-      if (!confirm('Available stock ' + fmtN(avail) + ' KL che, pan ' + fmtN(qty) + ' OUT karva mangu cho. Continue?')) return;
+    if (qtyKL > avail + 0.001) {
+      if (!confirm('Available stock ' + fmtN(avail) + ' KL che, pan ' + fmtN(qtyKL) + ' KL OUT karva mangu cho. Continue?')) return;
     }
   }
 
@@ -542,7 +564,8 @@ function saveTxn() {
     material_id:   tank ? tank.material_id : null,
     material_name: mat ? mat.name : '',
     txn_type:      curTxnType,
-    quantity:       qty,
+    quantity:       qtyKL,      // stored in KL
+    quantity_kg:    kg,          // original KG entry
     unit:           'KL',
     remark:         remark,
     entry_date:     TODAY,
@@ -552,7 +575,7 @@ function saveTxn() {
   sbClient.from('stock_entries').insert([payload]).then(function(res) {
     if (res.error) { showToast('Save nahi thayuu: ' + res.error.message, 'error'); return; }
     closeModal('txn-modal');
-    showToast(curTxnType==='IN' ? 'IN save thayuu' : 'OUT save thayuu', 'success');
+    showToast(curTxnType==='IN' ? 'IN save thayuu (' + fmtN(qtyKL) + ' KL)' : 'OUT save thayuu (' + fmtN(qtyKL) + ' KL)', 'success');
     loadTodayEntries(function() {
       renderTanks();
       renderLog();
